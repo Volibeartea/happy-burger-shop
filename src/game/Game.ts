@@ -47,6 +47,7 @@ export class Game implements GameContext {
   private readonly input: InputManager;
   private readonly registry = new InteractionRegistry();
   private readonly pointer: PointerController;
+  private readonly drag: DragController;
   private readonly hud: HUD;
   private readonly startScreen: StartScreen;
   private readonly resultScreen: ResultScreen;
@@ -75,8 +76,7 @@ export class Game implements GameContext {
     this.input = new InputManager(canvas, this.sceneManager.camera);
     this.hud = new HUD(uiRoot, this.state, this.platform, { onPause: () => this.togglePause() });
     this.pointer = new PointerController(this.input, this.registry, this.hud, canvas);
-    // Self-wires onto InputManager's pointer callbacks; no stored reference needed.
-    new DragController(this.input, this.registry, this.pointer, canvas);
+    this.drag = new DragController(this.input, this.registry, this.pointer, canvas);
 
     this.orderManager = new OrderManager(this.recipes, {
       onComplete: (order) => this.onOrderComplete(order),
@@ -92,6 +92,7 @@ export class Game implements GameContext {
     this.buildStations();
     this.loop = new GameLoop(this.update);
     this.startScreen.show();
+    this.drag.setEnabled(false); // no interaction until a round starts
   }
 
   get scene(): THREE.Scene {
@@ -133,11 +134,13 @@ export class Game implements GameContext {
     this.startScreen.hide();
     this.resultScreen.hide();
     this.pauseOverlay.hide();
+    this.drag.setEnabled(true);
   }
 
   private endGame(): void {
     if (this.state.phase !== 'playing') return;
     this.state.phase = 'result';
+    this.drag.setEnabled(false);
     this.hud.clearOrders();
     const isNewBest = this.state.score > this.state.bestScore;
     this.state.bestScore = this.save.updateHighScore(this.state.score);
@@ -157,10 +160,12 @@ export class Game implements GameContext {
   private togglePause(): void {
     if (this.state.phase === 'playing') {
       this.state.phase = 'paused';
+      this.drag.setEnabled(false);
       this.pauseOverlay.show();
       this.hud.setPaused(true);
     } else if (this.state.phase === 'paused') {
       this.state.phase = 'playing';
+      this.drag.setEnabled(true);
       this.pauseOverlay.hide();
       this.hud.setPaused(false);
     }

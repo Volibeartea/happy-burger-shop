@@ -26,6 +26,8 @@ export class DragController {
   private candidate: DropTarget | null = null;
   /** Holder the dragged item was released from, so we can put it back on a miss. */
   private originHolder: ItemHolder | null = null;
+  /** Interaction is only live while the game is being played. */
+  private enabled = true;
 
   constructor(
     private readonly input: InputManager,
@@ -52,6 +54,7 @@ export class DragController {
   }
 
   private readonly handleDown = (e: PointerEvent): void => {
+    if (!this.enabled) return;
     // Only the primary (left) button arms a pick / drag.
     if (e.button !== 0) return;
     this.downX = e.clientX;
@@ -62,6 +65,7 @@ export class DragController {
   };
 
   private readonly handleMove = (e: PointerEvent): void => {
+    if (!this.enabled) return;
     if (this.dragging) {
       this.updateDrag();
       return;
@@ -77,6 +81,7 @@ export class DragController {
   };
 
   private readonly handleUp = (e: PointerEvent): void => {
+    if (!this.enabled) return;
     // Ignore non-primary button releases so a mid-drag right-click can't drop.
     if (e.button !== 0) return;
     if (this.dragging) {
@@ -161,4 +166,17 @@ export class DragController {
     this.pending = null;
     this.downInteractive = null;
   };
+
+  /**
+   * Enable/disable all interaction. Disabling aborts any in-flight drag (the
+   * item returns to its origin) and clears hover, so nothing can be dragged or
+   * highlighted while a menu / pause / result overlay is up.
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.handleCancel();
+      this.pointer.clear();
+    }
+  }
 }

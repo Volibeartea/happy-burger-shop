@@ -449,6 +449,7 @@ electron/
 - UI：HUD（時間/分數/金錢/生命/Combo）、訂單卡（圖示 + 耐心條）、出餐 toast、開始/暫停/結算彈窗、重新開始；`Overlay` 共用基底。
 - 出餐比對移入 `OrderManager`，`ServingStation` 僅轉發 `Serving`。
 - 重新開始完整清場（`resetWorld` 銷毀食材 + 站台 `reset` 清格位/堆疊）。
+- **併入第四階段審查修正**：互動層隨階段開關（`DragController.setEnabled`）——離開 playing 即中止進行中的拖曳並清除 hover，避免可在開始/暫停/結算遮罩上拖放或讓工作台透光高亮。
 - 資料新增食材 emoji `icon`（訂單卡圖示）。
 - **併入第三階段審查修正**：漢堡各成分依實際熟度上色（燒焦/未熟不再一律顯示完美色）；打包 pad 前移縮小，避免點到最底層食材誤觸打包。
 - `tsc` + `vite build` 通過。
