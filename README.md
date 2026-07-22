@@ -8,6 +8,22 @@
 
 ---
 
+## 線上試玩
+
+推送到 `main` 後由 GitHub Actions 自動建置並部署到 GitHub Pages：
+
+**▶ https://volibeartea.github.io/happy-burger-shop/**
+
+> 首次需在 GitHub 倉庫 **Settings → Pages → Build and deployment → Source** 選擇 **GitHub Actions**，之後每次 push 會自動更新。
+
+其他試玩方式：
+
+- **本機建置版**：`npm run build && npm run preview`（預設 http://localhost:4173/）
+- **同區網分享**：`npm run dev` 後用終端顯示的 `Network` 網址（如 `http://192.168.x.x:5173/`）讓同網段的人開啟
+- **打包分享**：把 `dist/` 資料夾用任一靜態伺服器（或壓縮後）分享
+
+---
+
 ## 專案用途
 
 在漢堡店工作區內，玩家以滑鼠操作各種料理設備完成顧客訂單：拿取食材 → 烹調 → 組裝 → 出餐，於顧客失去耐心前正確出餐以獲得分數、金錢與 Combo。第一版以「一個可以完整開始、遊玩、結算、重新開始」的垂直切片為目標，並分階段擴充。
