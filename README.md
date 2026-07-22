@@ -18,9 +18,11 @@
 
 其他試玩方式：
 
+- **單一檔案版（可直接雙擊開啟）**：`npm run build:standalone` → 產生 `dist-standalone/index.html`，所有 JS/CSS 都內嵌成一個檔案，**直接用瀏覽器打開（file://）就能玩**，也可單檔寄給別人。
 - **本機建置版**：`npm run build && npm run preview`（預設 http://localhost:4173/）
 - **同區網分享**：`npm run dev` 後用終端顯示的 `Network` 網址（如 `http://192.168.x.x:5173/`）讓同網段的人開啟
-- **打包分享**：把 `dist/` 資料夾用任一靜態伺服器（或壓縮後）分享
+
+> 為什麼一般 `dist/index.html` 直接雙擊打不開？因為它用 `<script type="module" src="./assets/…">` 載入外部 JS，瀏覽器基於安全性**禁止 `file://` 載入外部 ES module**，必須透過 http 伺服器（`npm run dev`/`preview` 或 GitHub Pages）。單一檔案版把 JS 全部內嵌，就沒有這個限制。
 
 ---
 
