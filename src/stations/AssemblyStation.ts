@@ -20,7 +20,7 @@ class AssemblyPlate implements Interactive {
       emissive: new THREE.Color(0x4a8f5a),
       emissiveIntensity: 0,
     });
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 20), this.material);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.08, 20), this.material);
     disc.position.y = 0.04;
     disc.castShadow = true;
     disc.receiveShadow = true;
@@ -68,7 +68,9 @@ export class AssemblyStation extends Station implements ItemContainer {
     });
 
     this.plate = new AssemblyPlate(onPlateUp);
-    this.plate.root.position.set(0, this.topY - layout.position.y, layout.depth / 2 - 0.55);
+    // Sit the pad near the front edge, clear of the centred stack so clicking an
+    // ingredient never lands on the (nearer-camera) plate.
+    this.plate.root.position.set(0, this.topY - layout.position.y, layout.depth / 2 - 0.35);
     this.root.add(this.plate.root);
   }
 
@@ -109,6 +111,11 @@ export class AssemblyStation extends Station implements ItemContainer {
     for (const item of items) item.container = null;
     this.stack.length = 0;
     return items;
+  }
+
+  /** Clears the stack (items themselves are disposed by the Game on restart). */
+  reset(): void {
+    this.stack.length = 0;
   }
 
   private relayout(): void {

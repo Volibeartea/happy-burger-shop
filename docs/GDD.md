@@ -2,10 +2,10 @@
 
 > 這是一份**持續維護**的開發文件。每完成一個階段或做出重要設計決策，都應更新對應章節與最後的〈變更紀錄〉。
 >
-> - 文件版本：`v0.3`
-> - 對應程式版本：`0.3.0`
+> - 文件版本：`v0.4`
+> - 對應程式版本：`0.4.0`
 > - 最後更新：2026-07-22
-> - 目前開發階段：**第三階段（組裝與食譜）完成**
+> - 目前開發階段：**第四階段（訂單與遊戲流程）完成 — 已是可完整遊玩／結算／重開的版本**
 
 ---
 
@@ -90,11 +90,12 @@
 - [x] 出餐區判定（比對食譜 + 全熟）並以 toast 回饋；垃圾桶丟棄整份
 - [x] 單一完成食材（如薯條）可直接出餐
 
-### 第四階段：訂單與遊戲流程 — ⬜ 未開始
+### 第四階段：訂單與遊戲流程 — ✅ 完成
 
-- [ ] `OrderManager`：最多三張訂單、生成間隔、耐心條
-- [ ] 計時、生命、分數、金錢、Combo、`ScoreManager`
-- [ ] 開始畫面、暫停、結算畫面、重新開始
+- [x] `OrderManager`：最多三張訂單、生成間隔、耐心倒數、超時處理、自動匹配
+- [x] 計時（180 秒）、生命（3）、分數、金錢、Combo、`ScoreManager`
+- [x] 開始畫面、暫停（凍結烹調/計時）、結算畫面、重新開始
+- [x] HUD：時間/分數/金錢/生命/Combo + 訂單卡（耐心條）+ 出餐 toast
 
 ### 第五階段：手感與視覺效果 — ⬜ 未開始
 
@@ -158,11 +159,14 @@ happy-burger-shop/
    ├─ entities/
    │  ├─ IngredientEntity.ts      ✅ 資料驅動食材（拖曳＋烹調狀態機＋翻面＋提示）
    │  ├─ Burger.ts                ✅ 組裝完成的漢堡聚合物（整份拖曳、可出餐）
+   │  ├─ CustomerOrder.ts         ✅ 單張訂單（食譜 + 耐心倒數）
    │  ├─ Cookable.ts              ✅ Cookable 介面 + isCookable 判斷
    │  ├─ Servable.ts              ✅ Servable 介面（出餐時提供 ids + allReady）
    │  └─ shapes.ts                ✅ 共用 buildShape（食材/漢堡共用幾何）
    ├─ systems/
-   │  └─ RecipeManager.ts         ✅ 多重集合食譜比對（O(1) 查表）
+   │  ├─ RecipeManager.ts         ✅ 多重集合食譜比對（O(1) 查表）
+   │  ├─ OrderManager.ts          ✅ 訂單生成/耐心/超時/自動匹配
+   │  └─ ScoreManager.ts          ✅ 分數/金錢/Combo/生命規則
    ├─ stations/
    │  ├─ Station.ts               ✅ 站台基底（本體/名牌/footprint/高亮）
    │  ├─ CookingStation.ts        ✅ 有格位的烹調站基底（容量/釋放）
@@ -177,7 +181,11 @@ happy-burger-shop/
    │  ├─ BrowserPlatform.ts       ✅ localStorage + 全螢幕
    │  └─ SaveService.ts           ✅ 存檔（highScore/settings）
    ├─ ui/
-   │  └─ HUD.ts                   ✅ 頂欄/最佳分/全螢幕/說明/tooltip
+   │  ├─ HUD.ts                   ✅ 時間/分數/金錢/生命/Combo/訂單/暫停/tooltip/toast
+   │  ├─ OrderCard.ts             ✅ 單張訂單卡（圖示 + 耐心條）
+   │  ├─ Overlay.ts               ✅ 全螢幕彈窗基底（開始/暫停/結算共用）
+   │  ├─ StartScreen.ts           ✅ 開始畫面
+   │  └─ ResultScreen.ts          ✅ 結算畫面（統計 + 重新開始）
    ├─ data/
    │  ├─ types.ts                 ✅ 資料型別
    │  ├─ ingredients.ts           ✅ 食材資料
@@ -187,9 +195,8 @@ happy-burger-shop/
       └─ main.css                 ✅ HUD/畫面樣式
 
 # 後續階段將新增（尚未建立，避免空殼）
-   systems/  OrderManager(P4) ScoreManager(P4) AudioManager(P5)
-   entities/ CustomerOrder(P4)
-   ui/       OrderCard(P4) StartScreen(P4) ResultScreen(P4)
+   systems/  AudioManager(P5)
+   particles/ 或 fx/  （P5 粒子效果）
 electron/    main.ts preload.ts ipc/*   （未來 Electron 階段）
 
 # 註：烹調不另立 CookingSystem，改由 IngredientEntity 自身推進（見第 9、17 節）。
@@ -319,7 +326,10 @@ interface RecipeDefinition {
 
 ---
 
-## 11. 訂單系統（第四階段規格）
+## 11. 訂單系統（第四階段 — 已實作）
+
+> `OrderManager` 每幀推進：`tick` 耐心 → 移除超時（`onTimeout`）→ 不足三張時依 `spawnIntervalSec` 生成隨機食譜訂單。`submit(serving)` 以 `RecipeManager` 辨識餐點後，自動匹配**第一張**同食譜的訂單並完成；否則視為錯誤出餐。UI 以 `OrderView` 快照渲染卡片、每幀更新耐心條寬度與顏色（綠→紅）。
+
 
 - 畫面最多同時三張訂單；每張含顧客圖示、名稱、所需餐點、材料分解、耐心條、分數、金錢。
 - 耐心隨時間下降；越快完成，時間獎勵越高。
@@ -329,7 +339,10 @@ interface RecipeDefinition {
 
 ---
 
-## 12. 遊戲規則與結算（第四階段規格）
+## 12. 遊戲規則與結算（第四階段 — 已實作）
+
+> 流程狀態：`menu → playing ⇄ paused → result → (重新開始) playing`。僅 `playing` 時推進食材 `update`（烹調）、計時與訂單；暫停即凍結。`ScoreManager` 施行 Combo 倍率（`1+(combo-1)*step`，上限 `maxMultiplier`）、速度加成（`speedBonusMax*耐心比例`）、錯誤懲罰與超時扣命。時間歸零或生命歸零 → `result`，寫入最佳分數並顯示統計。
+
 
 - 單局 180 秒；生命 3 點；生命歸零或時間結束 → 結算。
 - 正確出餐：基礎分 + 剩餘耐心加成 + 金錢 + Combo；錯誤：扣分、Combo 歸零。
@@ -399,6 +412,9 @@ electron/
 | 11 | 組裝以「打包」pad 明確定案成 Burger，而非直接拖整疊 | 建構時個別食材可加/移除，打包後才整份出餐，避免「拿最上層 vs 拿整份」歧義 |
 | 12 | 無效放置改為「放回原容器」而非只回原位 | 修正審查發現：烹調中食材拖出後無效放置會卡在爐上不再烹調且格位外洩（見 v0.2.1） |
 | 13 | 持有食材的站台以 `ItemHolder = DropTarget & ItemContainer` 表示 | 讓「放回原容器」能重新 accept（回格位 + 續煮），型別清楚 |
+| 14 | 遊戲流程用單一 `phase` 狀態機，僅 playing 推進邏輯 | 暫停自然凍結烹調/計時，選單/結算不誤動；開始/暫停/結算彈窗遮罩即可阻擋互動 |
+| 15 | 出餐比對移到 `OrderManager`，站台只轉發 `Serving` | 訂單/計分邏輯集中，站台保持單純 |
+| 16 | 生命歸零於 `orderManager.update` 之後再判定 endGame | 避免超時結束遊戲的同一幀又生成新訂單 |
 
 ---
 
@@ -414,16 +430,28 @@ electron/
 
 ## 19. 已知問題與限制（第一階段）
 
-- 尚無訂單、耐心、計時、生命、分數/金錢/Combo、開始/結算畫面（屬第四階段）。
-- 出餐目前只比對「是否符合任一食譜」，尚未綁定特定訂單與計分（第四階段）。
-- 拖曳落點視差（front-strip 死區）已於審查後修正：改以站台頂面 `DROP_PLANE_Y` 投影做落點判定。
-- 無音效（第五階段）。
+- 無音效與粒子效果（油炸氣泡、蒸氣、燒焦煙、出餐星星等，屬第五階段）。
+- 訂單顧客為文字卡片，尚無角色圖像／動畫（第五階段可加）。
+- 無效放置改為放回原容器；若原本從烹調格位/堆疊中段取出，會回到「第一個空格/堆疊頂端」（順序不影響食譜，屬可接受的視覺小差異）。
+- 遊戲平衡（時間、耐心、分數）為初版數值，待第五階段實測調整。
 - 尚未針對觸控最佳化（第一版以桌面滑鼠為主）。
 - Three.js 打包體積 > 500 kB（單一 chunk 警告）；未來可 code-split，暫不處理。
 
 ---
 
 ## 20. 變更紀錄（Changelog）
+
+### v0.4（2026-07-22）— 第四階段完成（訂單與遊戲流程）→ 首個完整可玩版本
+
+- `OrderManager`：最多三張訂單、依 `spawnIntervalSec` 生成、耐心倒數、超時 `onTimeout`、`submit` 自動匹配第一張同食譜訂單。
+- `ScoreManager`：Combo 倍率、速度加成、錯誤懲罰、超時扣命；`GameState` 集中回合狀態與統計。
+- 流程狀態機 `menu/playing/paused/result`：僅 playing 推進烹調/計時/訂單；暫停凍結。
+- UI：HUD（時間/分數/金錢/生命/Combo）、訂單卡（圖示 + 耐心條）、出餐 toast、開始/暫停/結算彈窗、重新開始；`Overlay` 共用基底。
+- 出餐比對移入 `OrderManager`，`ServingStation` 僅轉發 `Serving`。
+- 重新開始完整清場（`resetWorld` 銷毀食材 + 站台 `reset` 清格位/堆疊）。
+- 資料新增食材 emoji `icon`（訂單卡圖示）。
+- **併入第三階段審查修正**：漢堡各成分依實際熟度上色（燒焦/未熟不再一律顯示完美色）；打包 pad 前移縮小，避免點到最底層食材誤觸打包。
+- `tsc` + `vite build` 通過。
 
 ### v0.3（2026-07-22）— 第三階段完成（組裝與食譜）
 

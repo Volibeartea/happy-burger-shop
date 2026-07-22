@@ -56,6 +56,11 @@ export abstract class CookingStation extends Station implements ItemContainer {
     if (isCookable(item)) item.endCooking();
   }
 
+  /** Clears all slots (items themselves are disposed by the Game on restart). */
+  reset(): void {
+    this.slots.fill(null);
+  }
+
   private slotWorldPosition(index: number, out = new THREE.Vector3()): THREE.Vector3 {
     const col = index % this.cols;
     const row = Math.floor(index / this.cols);

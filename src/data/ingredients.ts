@@ -11,6 +11,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'patty',
     displayName: '漢堡肉',
+    icon: '🥩',
     cookable: true,
     validStations: ['grill', 'assembly'],
     cookDuration: 4, // per side
@@ -27,6 +28,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'friedChicken',
     displayName: '炸雞',
+    icon: '🍗',
     cookable: true,
     validStations: ['fryer', 'assembly'],
     cookDuration: 6,
@@ -43,6 +45,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'fries',
     displayName: '薯條',
+    icon: '🍟',
     cookable: true,
     validStations: ['fryer'],
     cookDuration: 5,
@@ -61,6 +64,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'bunBottom',
     displayName: '麵包底',
+    icon: '🍞',
     cookable: false,
     validStations: ['assembly'],
     scoreValue: 5,
@@ -71,6 +75,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'bunTop',
     displayName: '麵包頂',
+    icon: '🍞',
     cookable: false,
     validStations: ['assembly'],
     scoreValue: 5,
@@ -81,6 +86,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'cheese',
     displayName: '起司片',
+    icon: '🧀',
     cookable: false,
     validStations: ['assembly'],
     scoreValue: 10,
@@ -91,6 +97,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'lettuce',
     displayName: '生菜',
+    icon: '🥬',
     cookable: false,
     validStations: ['assembly'],
     scoreValue: 8,
@@ -101,6 +108,7 @@ export const INGREDIENTS: readonly IngredientDefinition[] = [
   {
     id: 'tomato',
     displayName: '番茄片',
+    icon: '🍅',
     cookable: false,
     validStations: ['assembly'],
     scoreValue: 8,

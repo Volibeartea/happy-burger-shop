@@ -32,6 +32,8 @@ export type IngredientShape =
 export interface IngredientDefinition {
   readonly id: string;
   readonly displayName: string;
+  /** Emoji used in order cards / breakdown icons. */
+  readonly icon: string;
   /** Whether the ingredient must be cooked before it counts as prepared. */
   readonly cookable: boolean;
   /** Stations onto which this ingredient may be placed. */

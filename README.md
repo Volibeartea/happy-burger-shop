@@ -44,8 +44,9 @@ npm run typecheck # 只做 TypeScript 型別檢查
 | 漢堡肉拖到 **煎台** | 開始煎製；**點擊漢堡肉翻面**，兩面都到「✓完美」再取出 |
 | 炸雞 / 薯條拖到 **油鍋** | 開始炸製；到「✓完美」時取出，過久會 **燒焦** |
 | 材料拖到 **組裝台** | 垂直堆疊；點擊 **打包** pad → 完成一份漢堡 |
-| 完成餐點拖到 **出餐區** | 比對食譜（材料種類/數量 + 全熟），以 toast 顯示 ✓/✗ |
+| 完成餐點拖到 **出餐區** | 自動比對對應訂單，正確得分/金錢/Combo，錯誤扣分 |
 | 拖到 **垃圾桶** | 丟棄食材或整份漢堡（含燒焦） |
+| 右上 **⏸** | 暫停 / 繼續（暫停時凍結烹調與計時） |
 | 放到**無效位置** | 食材自動彈回原位，不會消失 |
 | 滑鼠移到可互動物件 | 高亮 + 游標變化 + 近游標操作提示 |
 | 右上「⛶ 全螢幕」 | 切換全螢幕 |
@@ -78,10 +79,16 @@ npm run typecheck # 只做 TypeScript 型別檢查
 - `RecipeManager` 以材料多重集合比對食譜（不檢查堆疊順序）。
 - 出餐區判定（符合食譜 + 全熟）並以 toast 回饋；單一完成薯條可直接出餐。
 
+**第四階段（訂單與遊戲流程）— 首個完整可玩版本**
+
+- 最多三張顧客訂單、耐心條倒數、超時失去生命；出餐自動匹配對應訂單。
+- 計時（180 秒）、分數、金錢、Combo、速度加成、錯誤懲罰。
+- 開始畫面 → 遊玩（可暫停）→ 時間/生命結束 → 結算（統計 + 最佳分數）→ 重新開始。
+- HUD 顯示時間/分數/金錢/生命/Combo 與訂單卡。
+
 ## 尚未完成功能
 
-- **第四階段**：訂單、耐心條、計時、生命、分數/金錢/Combo、開始/暫停/結算/重新開始。
-- **第五階段**：粒子、音效、動畫、UI 精修與平衡。
+- **第五階段**：粒子效果（油炸氣泡、蒸氣、燒焦煙、出餐星星）、音效、動畫、UI 精修與平衡調整。
 
 （各階段規格見 [docs/GDD.md](docs/GDD.md)。）
 
@@ -95,11 +102,11 @@ src/
 ├─ game/              Game / GameLoop / GameState / GameConfig / GameContext / Updatable
 ├─ scene/             SceneManager / CameraController / Lighting / KitchenScene / TextSprite
 ├─ input/             InputManager / PointerController / DragController / InteractionTypes / InteractionRegistry
-├─ entities/          IngredientEntity / Burger / Cookable / Servable / shapes
+├─ entities/          IngredientEntity / Burger / CustomerOrder / Cookable / Servable / shapes
 ├─ stations/          Station / CookingStation / Fryer / Grill / Assembly / Storage / Serving / Trash
-├─ systems/           RecipeManager
+├─ systems/           RecipeManager / OrderManager / ScoreManager
 ├─ platform/          PlatformService / BrowserPlatform / SaveService
-├─ ui/                HUD
+├─ ui/                HUD / OrderCard / Overlay / StartScreen / ResultScreen
 ├─ data/              types / ingredients / recipes / gameBalance
 └─ styles/            main.css
 ```
@@ -126,7 +133,7 @@ Electron 只作為桌面容器，不與遊戲核心綁定：
 
 ## 已知問題
 
-- 第四～五階段功能尚未實作（訂單、耐心、計時、生命、分數、音效、結算）。
-- 出餐目前只比對「是否符合任一食譜」，尚未綁定特定訂單與計分。
+- 第五階段功能尚未實作（粒子、音效、動畫、平衡微調）。
+- 訂單顧客為文字卡片，尚無角色圖像。
 - Three.js 打包為單一 chunk（> 500 kB 警告），未來可 code-split，暫不處理。
 - 尚未針對行動裝置觸控最佳化。

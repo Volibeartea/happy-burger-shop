@@ -1,10 +1,28 @@
 import * as THREE from 'three';
+import type { CookState } from '@/data/types';
 import type { Draggable, ItemHolder } from '@/input/InteractionTypes';
 import type { Updatable } from '@/game/Updatable';
 import type { Servable, Serving } from '@/entities/Servable';
 import { INGREDIENTS_BY_ID } from '@/data/ingredients';
 import { buildShape, isFlatShaded } from '@/entities/shapes';
 import { CARRY_HEIGHT } from '@/game/GameConfig';
+
+/** One stacked component with the doneness it had when packaged. */
+export interface BurgerComponent {
+  id: string;
+  cookState: CookState;
+}
+
+/** Colour that reflects a component's actual doneness. */
+function colorFor(id: string, cookState: CookState): number {
+  const def = INGREDIENTS_BY_ID.get(id);
+  if (!def) return 0xffffff;
+  if (def.cookable) {
+    if (cookState === 'perfect' && def.cookedColor !== undefined) return def.cookedColor;
+    if (cookState === 'burnt' && def.burntColor !== undefined) return def.burntColor;
+  }
+  return def.color;
+}
 
 const HOVER_EMISSIVE = 0.3;
 const PICKUP_EMISSIVE = 0.45;
@@ -35,18 +53,20 @@ export class Burger implements Draggable, Updatable, Servable {
   private targetScale = 1;
   private targetEmissive = 0;
 
-  constructor(ids: string[], allReady: boolean) {
-    this.ingredientIds = [...ids];
-    this.allReady = allReady;
+  constructor(components: BurgerComponent[]) {
+    this.ingredientIds = components.map((c) => c.id);
+    this.allReady = components.every((c) => {
+      const def = INGREDIENTS_BY_ID.get(c.id);
+      return !def || !def.cookable || c.cookState === 'perfect';
+    });
     this.root.name = 'burger';
 
     let y = 0;
-    for (const id of ids) {
-      const def = INGREDIENTS_BY_ID.get(id);
+    for (const c of components) {
+      const def = INGREDIENTS_BY_ID.get(c.id);
       if (!def) continue;
       const { geometry, baseOffset } = buildShape(def.shape);
-      const color =
-        def.cookable && def.cookedColor !== undefined ? def.cookedColor : def.color;
+      const color = colorFor(c.id, c.cookState);
       const material = new THREE.MeshStandardMaterial({
         color,
         roughness: 0.6,
