@@ -5,6 +5,8 @@ import type { StationLayout } from '@/game/GameConfig';
 import { INGREDIENTS_BY_ID } from '@/data/ingredients';
 import { Station } from '@/stations/Station';
 import type { StationOptions } from '@/stations/Station';
+import type { CookMode } from '@/entities/Cookable';
+import { isCookable } from '@/entities/Cookable';
 
 /**
  * A station that holds a limited number of items in a grid of slots (油鍋 / 煎台).
@@ -45,11 +47,13 @@ export abstract class CookingStation extends Station implements ItemContainer {
     this.slots[idx] = item;
     item.container = this;
     item.snapTo(this.slotWorldPosition(idx));
+    if (isCookable(item)) item.beginCooking(this.id as CookMode);
   }
 
   release(item: Draggable): void {
     const idx = this.slots.indexOf(item);
     if (idx >= 0) this.slots[idx] = null;
+    if (isCookable(item)) item.endCooking();
   }
 
   private slotWorldPosition(index: number, out = new THREE.Vector3()): THREE.Vector3 {

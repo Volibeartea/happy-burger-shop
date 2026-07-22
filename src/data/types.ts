@@ -54,7 +54,12 @@ export interface IngredientDefinition {
   readonly spawnable?: boolean;
 
   // --- Placeholder art hints ---
+  /** Raw / default colour. */
   readonly color: number;
+  /** Colour at perfect doneness (cookable items). */
+  readonly cookedColor?: number;
+  /** Colour when fully burnt (cookable items). */
+  readonly burntColor?: number;
   readonly shape: IngredientShape;
   /** Vertical thickness (world units) when stacked in a burger. */
   readonly stackHeight: number;

@@ -2,10 +2,10 @@
 
 > 這是一份**持續維護**的開發文件。每完成一個階段或做出重要設計決策，都應更新對應章節與最後的〈變更紀錄〉。
 >
-> - 文件版本：`v0.1`
-> - 對應程式版本：`0.1.0`
+> - 文件版本：`v0.2`
+> - 對應程式版本：`0.2.0`
 > - 最後更新：2026-07-22
-> - 目前開發階段：**第一階段（基礎場景與互動）完成**
+> - 目前開發階段：**第二階段（烹調系統）完成**
 
 ---
 
@@ -74,13 +74,13 @@
 - [x] 平台抽象層（`PlatformService` / `BrowserPlatform` / `SaveService`）
 - [x] `npm run dev` / `npm run build` / `npm run preview` 正常
 
-### 第二階段：烹調系統 — ⬜ 未開始
+### 第二階段：烹調系統 — ✅ 完成
 
-- [ ] 漢堡肉雙面煎製與**翻面**
-- [ ] 炸雞、薯條的油鍋烹調
-- [ ] 狀態機：生 / 烹調中 / 完美 / 燒焦
-- [ ] 完成提示（顏色、圖示、跳動、粒子）與燒焦冒煙
-- [ ] `CookingSystem` 依時間推進各站食材狀態
+- [x] 漢堡肉雙面煎製與**翻面**（點擊漢堡肉翻面）
+- [x] 炸雞、薯條的油鍋烹調（單階段）
+- [x] 狀態機：生 / 烹調中 / 完美 / 燒焦（`data` 驅動時間）
+- [x] 完成提示（顏色漸變 + ✓完美標記 + 跳動）與燒焦標記
+- [x] 烹調推進：食材於自身 `update(dt)` 中依站台施加的 heat 模式推進（見設計決策 #9）
 
 ### 第三階段：組裝與食譜 — ⬜ 未開始
 
@@ -155,7 +155,8 @@ happy-burger-shop/
    │  ├─ InteractionTypes.ts      ✅ Interactive/Draggable/DropTarget 契約
    │  └─ InteractionRegistry.ts   ✅ mesh→物件解析、drop 判定
    ├─ entities/
-   │  └─ IngredientEntity.ts      ✅ 資料驅動食材（可拖曳、平滑動畫）
+   │  ├─ IngredientEntity.ts      ✅ 資料驅動食材（拖曳＋烹調狀態機＋翻面＋提示）
+   │  └─ Cookable.ts              ✅ Cookable 介面 + isCookable 判斷
    ├─ stations/
    │  ├─ Station.ts               ✅ 站台基底（本體/名牌/footprint/高亮）
    │  ├─ CookingStation.ts        ✅ 有格位的烹調站基底（容量/釋放）
@@ -180,10 +181,12 @@ happy-burger-shop/
       └─ main.css                 ✅ HUD/畫面樣式
 
 # 後續階段將新增（尚未建立，避免空殼）
-   systems/  CookingSystem(P2) OrderManager(P4) RecipeManager(P3) ScoreManager(P4) AudioManager(P5)
-   entities/ CookableIngredient(P2) Burger(P3) CustomerOrder(P4)
+   systems/  OrderManager(P4) RecipeManager(P3) ScoreManager(P4) AudioManager(P5)
+   entities/ Burger(P3) CustomerOrder(P4)
    ui/       OrderCard(P4) StartScreen(P4) ResultScreen(P4)
 electron/    main.ts preload.ts ipc/*   （未來 Electron 階段）
+
+# 註：烹調不另立 CookingSystem，改由 IngredientEntity 自身推進（見第 9、17 節）。
 ```
 
 ### 依賴方向（避免循環）
@@ -288,13 +291,14 @@ interface RecipeDefinition {
 
 ---
 
-## 9. 烹調系統設計（第二階段規格）
+## 9. 烹調系統設計（第二階段 — 已實作）
 
-- 每個可烹調食材具狀態機：`raw → cooking → perfect → burnt`，時間參數來自資料。
-- **漢堡肉（煎台）**：放上 → 第一面 → 手動翻面 → 第二面 → 完美 → 燒焦；兩面皆熟才算正確。
-- **炸雞／薯條（油鍋）**：容量有限，過久燒焦。
-- 完成/燒焦有明顯視覺與音效提示；燒焦不可用於正確訂單，但可拿起丟棄。
-- 由 `systems/CookingSystem` 於每幀依 dt 推進站台上食材狀態（第一階段的 `CookingStation` 已提供格位/容量/釋放基礎）。
+- 每個可烹調食材具狀態機：`raw → cooking → perfect → burnt`，時間參數（`cookDuration` / `perfectWindow` / `burnDuration`）來自 `data/ingredients.ts`。
+- **漢堡肉（煎台，`needsFlip`）**：分兩面計時（`sideTimes[0/1]`、`downSide`）。**點擊漢堡肉翻面**切換受熱面。唯有**兩面皆達 `cookDuration` 且皆未超過 `cookDuration+perfectWindow`** 才是 `perfect`；任一面過久 → `burnt`。未翻面只煎單面會卡在 `cooking` 直到燒焦。
+- **炸雞／薯條（油鍋）**：單一累加器；到 `cookDuration` 為 `perfect`，超過 `perfectWindow` → `burnt`。油鍋/煎台各有容量（`gameBalance`）。
+- **視覺提示**：顏色依 `cookedness`（raw→cooked）與 `burntness`（cooked→burnt）即時漸變；達 `perfect` 顯示「✓完美」標記並跳動；`burnt` 顯示「燒焦」標記。
+- **可用性**：`IngredientEntity.isReady` = 非烹調食材，或烹調食材為 `perfect`；燒焦/未熟不算正確（供第三階段食譜比對）。可拿起、可丟垃圾桶。
+- **推進方式（設計決策）**：烹調狀態屬於食材本身，於 `IngredientEntity.update(dt)` 推進，並以站台在 `accept/release` 呼叫的 `beginCooking(mode)/endCooking()`（`Cookable` 介面）作為「是否受熱」的閘門。離開站台即暫停、放回即續煮。**刻意不另立 `CookingSystem`**，避免過薄的 Manager（見第 20 節原則）。
 
 ---
 
@@ -382,6 +386,8 @@ electron/
 | 6 | 食材以「shape + color + 標籤」程序化生成 | 不依賴外部模型即可辨識，符合 placeholder 美術 |
 | 7 | 食材區以「點擊 bin 生成」而非預放 | 更貼近真實遊玩、示範資料驅動 + 點擊互動 |
 | 8 | 單一 Set 追蹤所有食材實體 | 同時可 update 與被 remove，避免多容器同步問題 |
+| 9 | 烹調狀態放在 `IngredientEntity`、以 `Cookable` 介面 + heat 閘門推進，不另立 CookingSystem | 狀態與其網格/視覺同源、隨既有 update 推進；避免過薄 Manager 與同步問題 |
+| 10 | 翻面用「點擊食材」而非額外按鈕 | 沿用既有點擊/拖曳分辨：點擊=翻面、拖曳=移動，無新 UI |
 
 ---
 
@@ -407,6 +413,16 @@ electron/
 ---
 
 ## 20. 變更紀錄（Changelog）
+
+### v0.2（2026-07-22）— 第二階段完成（烹調系統）
+
+- 烹調狀態機 `raw/cooking/perfect/burnt`，時間參數資料驅動（`cookDuration/perfectWindow/burnDuration`）。
+- 煎台漢堡肉雙面計時 + **點擊翻面**；兩面皆熟才 `perfect`，過久 `burnt`。
+- 油鍋炸雞/薯條單階段烹調。
+- 視覺：raw→cooked→burnt 顏色即時漸變、`✓完美` 與 `燒焦` 標記、完美跳動、翻面動畫。
+- `Cookable` 介面 + `CookingStation` 於 accept/release 呼叫 begin/endCooking；離站暫停、回站續煮。
+- `IngredientEntity.isReady` 供第三階段食譜比對使用。
+- HUD 更新為 Phase 2 說明；`tsc` + `vite build` 通過。
 
 ### v0.1（2026-07-22）— 第一階段完成
 
