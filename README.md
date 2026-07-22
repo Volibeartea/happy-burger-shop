@@ -43,9 +43,9 @@ npm run typecheck # 只做 TypeScript 型別檢查
 | **拖曳** 食材 | 拿取並移動；經過可放置站台會高亮 |
 | 漢堡肉拖到 **煎台** | 開始煎製；**點擊漢堡肉翻面**，兩面都到「✓完美」再取出 |
 | 炸雞 / 薯條拖到 **油鍋** | 開始炸製；到「✓完美」時取出，過久會 **燒焦** |
-| 拖到 **組裝台** | 堆疊材料（第三階段接食譜判定） |
-| 拖到 **出餐區** | 送出餐點（第一/二階段僅移除，訂單判定於第四階段） |
-| 拖到 **垃圾桶** | 丟棄食材（含燒焦） |
+| 材料拖到 **組裝台** | 垂直堆疊；點擊 **打包** pad → 完成一份漢堡 |
+| 完成餐點拖到 **出餐區** | 比對食譜（材料種類/數量 + 全熟），以 toast 顯示 ✓/✗ |
+| 拖到 **垃圾桶** | 丟棄食材或整份漢堡（含燒焦） |
 | 放到**無效位置** | 食材自動彈回原位，不會消失 |
 | 滑鼠移到可互動物件 | 高亮 + 游標變化 + 近游標操作提示 |
 | 右上「⛶ 全螢幕」 | 切換全螢幕 |
@@ -72,9 +72,14 @@ npm run typecheck # 只做 TypeScript 型別檢查
 - 油鍋炸雞 / 薯條單階段烹調，過久燒焦。
 - 視覺提示：顏色即時漸變、「✓完美」與「燒焦」標記、完美跳動、翻面動畫。
 
+**第三階段（組裝與食譜）**
+
+- 組裝台垂直堆疊材料，點擊「打包」→ `Burger` 聚合物件（整份拖曳）。
+- `RecipeManager` 以材料多重集合比對食譜（不檢查堆疊順序）。
+- 出餐區判定（符合食譜 + 全熟）並以 toast 回饋；單一完成薯條可直接出餐。
+
 ## 尚未完成功能
 
-- **第三階段**：完整組裝、`Burger` 物件、食譜比對。
 - **第四階段**：訂單、耐心條、計時、生命、分數/金錢/Combo、開始/暫停/結算/重新開始。
 - **第五階段**：粒子、音效、動畫、UI 精修與平衡。
 
@@ -90,8 +95,9 @@ src/
 ├─ game/              Game / GameLoop / GameState / GameConfig / GameContext / Updatable
 ├─ scene/             SceneManager / CameraController / Lighting / KitchenScene / TextSprite
 ├─ input/             InputManager / PointerController / DragController / InteractionTypes / InteractionRegistry
-├─ entities/          IngredientEntity / Cookable
+├─ entities/          IngredientEntity / Burger / Cookable / Servable / shapes
 ├─ stations/          Station / CookingStation / Fryer / Grill / Assembly / Storage / Serving / Trash
+├─ systems/           RecipeManager
 ├─ platform/          PlatformService / BrowserPlatform / SaveService
 ├─ ui/                HUD
 ├─ data/              types / ingredients / recipes / gameBalance
@@ -120,7 +126,7 @@ Electron 只作為桌面容器，不與遊戲核心綁定：
 
 ## 已知問題
 
-- 第三～五階段功能尚未實作（訂單、計時、分數、音效）。
-- `data/recipes.ts` 已備資料但第三階段才會使用。
+- 第四～五階段功能尚未實作（訂單、耐心、計時、生命、分數、音效、結算）。
+- 出餐目前只比對「是否符合任一食譜」，尚未綁定特定訂單與計分。
 - Three.js 打包為單一 chunk（> 500 kB 警告），未來可 code-split，暫不處理。
 - 尚未針對行動裝置觸控最佳化。

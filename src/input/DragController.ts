@@ -1,7 +1,7 @@
 import type { InputManager } from '@/input/InputManager';
 import type { InteractionRegistry } from '@/input/InteractionRegistry';
 import type { PointerController } from '@/input/PointerController';
-import type { Draggable, DropTarget, Interactive } from '@/input/InteractionTypes';
+import type { Draggable, DropTarget, Interactive, ItemHolder } from '@/input/InteractionTypes';
 import { isDraggable } from '@/input/InteractionTypes';
 import { DROP_PLANE_Y } from '@/game/GameConfig';
 
@@ -24,6 +24,8 @@ export class DragController {
   private downX = 0;
   private downY = 0;
   private candidate: DropTarget | null = null;
+  /** Holder the dragged item was released from, so we can put it back on a miss. */
+  private originHolder: ItemHolder | null = null;
 
   constructor(
     private readonly input: InputManager,
@@ -94,6 +96,8 @@ export class DragController {
   private startDrag(item: Draggable): void {
     this.dragging = item;
     this.pending = null;
+    // Remember where it came from so an invalid drop can put it back consistently.
+    this.originHolder = item.container;
     item.container?.release(item);
     item.container = null;
     // Clear hover FIRST (its onHoverLeave resets scale/emissive), then apply the
@@ -123,13 +127,25 @@ export class DragController {
     const target = p ? this.registry.dropTargetAt(p.x, p.z, item) : undefined;
     this.candidate?.setDropCandidate(false);
     this.candidate = null;
+    this.settleDrop(item, target);
+    this.originHolder = null;
+    this.dragging = null;
+    this.pointer.suspend(false);
+  }
+
+  /**
+   * Places the item at the end of a drag: onto a valid target, otherwise back
+   * into the holder it came from (re-claiming its slot / re-cooking), otherwise
+   * back to its free-standing origin.
+   */
+  private settleDrop(item: Draggable, target: DropTarget | undefined): void {
     if (target) {
       target.accept(item);
+    } else if (this.originHolder && this.originHolder.canAccept(item)) {
+      this.originHolder.accept(item);
     } else {
       item.returnToOrigin();
     }
-    this.dragging = null;
-    this.pointer.suspend(false);
   }
 
   /** Abort an in-flight interaction (pointercancel / window blur). */
@@ -137,7 +153,8 @@ export class DragController {
     if (this.dragging) {
       this.candidate?.setDropCandidate(false);
       this.candidate = null;
-      this.dragging.returnToOrigin();
+      this.settleDrop(this.dragging, undefined);
+      this.originHolder = null;
       this.dragging = null;
       this.pointer.suspend(false);
     }

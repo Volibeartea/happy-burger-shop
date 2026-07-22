@@ -144,3 +144,36 @@ body {
   white-space: nowrap;
   transform: translateZ(0);
 }
+
+.hud-toast {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(24, 28, 38, 0.92);
+  border: 1px solid var(--hud-border);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.hud-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.hud-toast.ok {
+  background: rgba(46, 160, 80, 0.96);
+}
+
+.hud-toast.bad {
+  background: rgba(200, 64, 52, 0.96);
+}

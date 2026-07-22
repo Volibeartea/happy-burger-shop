@@ -1,25 +1,84 @@
 import * as THREE from 'three';
 import type { StationLayout } from '@/game/GameConfig';
-import type { Draggable, ItemContainer } from '@/input/InteractionTypes';
+import type { Draggable, Interactive, ItemContainer } from '@/input/InteractionTypes';
 import { INGREDIENTS_BY_ID } from '@/data/ingredients';
+import { createTextSprite } from '@/scene/TextSprite';
 import { Station } from '@/stations/Station';
 
+/** A clickable pad that packages the current assembly stack into a burger. */
+class AssemblyPlate implements Interactive {
+  readonly root = new THREE.Group();
+  readonly hoverHint = '打包出餐 · 點擊完成餐點';
+  private readonly material: THREE.MeshStandardMaterial;
+
+  constructor(private readonly onPack: () => void) {
+    this.root.name = 'assembly-plate';
+    this.material = new THREE.MeshStandardMaterial({
+      color: 0x4a8f5a,
+      roughness: 0.5,
+      metalness: 0.1,
+      emissive: new THREE.Color(0x4a8f5a),
+      emissiveIntensity: 0,
+    });
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 20), this.material);
+    disc.position.y = 0.04;
+    disc.castShadow = true;
+    disc.receiveShadow = true;
+    this.root.add(disc);
+
+    const label = createTextSprite('打包', {
+      worldHeight: 0.3,
+      fontSize: 40,
+      bg: 'rgba(46, 160, 80, 0.94)',
+      color: '#ffffff',
+    });
+    label.position.set(0, 0.55, 0);
+    this.root.add(label);
+  }
+
+  onHoverEnter(): void {
+    this.material.emissiveIntensity = 0.5;
+  }
+
+  onHoverLeave(): void {
+    this.material.emissiveIntensity = 0;
+  }
+
+  onClick(): void {
+    this.onPack();
+  }
+}
+
 /**
- * 組裝台 — ingredients are stacked vertically to form a burger. v1 order-matching
- * (Phase 3+) compares the multiset of ingredient ids, so stacking order is not
- * enforced. Exposes the current stack for recipe comparison later.
+ * 組裝台 — ingredients are stacked vertically. Clicking the 打包 pad packages the
+ * current stack into a single Burger (handled by the Game). v1 order matching
+ * (RecipeManager) compares the multiset of ids, so stacking order is not enforced.
  */
 export class AssemblyStation extends Station implements ItemContainer {
   private readonly stack: Draggable[] = [];
   private readonly tmp = new THREE.Vector3();
+  private readonly plate: AssemblyPlate;
 
-  constructor(layout: StationLayout) {
+  constructor(layout: StationLayout, onPlateUp: () => void) {
     super('assembly', layout, {
       color: 0xcaa06a,
       label: '組裝台',
       hoverHint: '組裝台 · 堆疊材料',
       bodyHeight: 0.5,
     });
+
+    this.plate = new AssemblyPlate(onPlateUp);
+    this.plate.root.position.set(0, this.topY - layout.position.y, layout.depth / 2 - 0.55);
+    this.root.add(this.plate.root);
+  }
+
+  /** The clickable 打包 pad (registered as its own interactive by the Game). */
+  getPlate(): Interactive {
+    return this.plate;
+  }
+
+  hasItems(): boolean {
+    return this.stack.length > 0;
   }
 
   canAccept(item: Draggable): boolean {
@@ -42,6 +101,14 @@ export class AssemblyStation extends Station implements ItemContainer {
   /** Ingredient ids currently stacked (bottom → top). */
   getStackIds(): string[] {
     return this.stack.map((item) => item.definitionId);
+  }
+
+  /** Detaches and returns the whole stack (used when packaging into a burger). */
+  takeAll(): Draggable[] {
+    const items = [...this.stack];
+    for (const item of items) item.container = null;
+    this.stack.length = 0;
+    return items;
   }
 
   private relayout(): void {

@@ -23,13 +23,20 @@ export interface ItemContainer {
   release(item: Draggable): void;
 }
 
+/**
+ * A drop target that also holds items (cooking station slots, assembly stack).
+ * On an invalid drop the item is re-accepted into the holder it came from, so
+ * slot occupancy and cooking state stay consistent with the item's position.
+ */
+export type ItemHolder = DropTarget & ItemContainer;
+
 /** An interactive object that can be picked up and dropped. */
 export interface Draggable extends Interactive {
   readonly isDraggable: true;
   readonly definitionId: string;
   readonly cookable: boolean;
-  /** The container currently holding this item, if any. */
-  container: ItemContainer | null;
+  /** The holder currently containing this item, if any. */
+  container: ItemHolder | null;
 
   /** Called when the item is lifted off its resting place. */
   onPickup(): void;

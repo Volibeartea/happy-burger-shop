@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import type { CookState, IngredientDefinition, IngredientShape } from '@/data/types';
-import type { Draggable, ItemContainer } from '@/input/InteractionTypes';
+import type { CookState, IngredientDefinition } from '@/data/types';
+import type { Draggable, ItemHolder } from '@/input/InteractionTypes';
 import type { Updatable } from '@/game/Updatable';
 import type { Cookable, CookMode } from '@/entities/Cookable';
+import type { Servable, Serving } from '@/entities/Servable';
+import { buildShape, isFlatShaded } from '@/entities/shapes';
 import { CARRY_HEIGHT } from '@/game/GameConfig';
 import { createTextSprite } from '@/scene/TextSprite';
 
@@ -14,38 +16,6 @@ const BOUNCE_DUR = 0.5;
 
 function clamp01(x: number): number {
   return x < 0 ? 0 : x > 1 ? 1 : x;
-}
-
-interface ShapeBuild {
-  geometry: THREE.BufferGeometry;
-  /** Half the item's vertical extent — mesh is raised so its base sits at y=0. */
-  baseOffset: number;
-}
-
-function buildShape(shape: IngredientShape): ShapeBuild {
-  switch (shape) {
-    case 'patty':
-      return { geometry: new THREE.CylinderGeometry(0.42, 0.42, 0.22, 20), baseOffset: 0.11 };
-    case 'bunBottom':
-      return { geometry: new THREE.CylinderGeometry(0.46, 0.42, 0.24, 20), baseOffset: 0.12 };
-    case 'bunTop': {
-      const geo = new THREE.SphereGeometry(0.48, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5);
-      geo.scale(1, 0.62, 1);
-      return { geometry: geo, baseOffset: 0 };
-    }
-    case 'slice':
-      return { geometry: new THREE.BoxGeometry(0.72, 0.06, 0.72), baseOffset: 0.03 };
-    case 'leaf':
-      return { geometry: new THREE.CylinderGeometry(0.52, 0.52, 0.1, 8), baseOffset: 0.05 };
-    case 'round':
-      return { geometry: new THREE.CylinderGeometry(0.4, 0.4, 0.08, 16), baseOffset: 0.04 };
-    case 'stick':
-      return { geometry: new THREE.BoxGeometry(0.5, 0.42, 0.42), baseOffset: 0.21 };
-    case 'nugget':
-      return { geometry: new THREE.IcosahedronGeometry(0.4, 0), baseOffset: 0.32 };
-    default:
-      return { geometry: new THREE.BoxGeometry(0.5, 0.5, 0.5), baseOffset: 0.25 };
-  }
 }
 
 function hintFor(def: IngredientDefinition): string {
@@ -63,7 +33,7 @@ function hintFor(def: IngredientDefinition): string {
  * sets via begin/endCooking. Grill items cook one side at a time and are flipped
  * by clicking them; fryer items cook in a single phase.
  */
-export class IngredientEntity implements Draggable, Updatable, Cookable {
+export class IngredientEntity implements Draggable, Updatable, Cookable, Servable {
   readonly isDraggable = true;
   readonly root = new THREE.Group();
   readonly definitionId: string;
@@ -71,7 +41,7 @@ export class IngredientEntity implements Draggable, Updatable, Cookable {
   readonly hoverHint: string;
   readonly def: IngredientDefinition;
 
-  container: ItemContainer | null = null;
+  container: ItemHolder | null = null;
 
   private readonly mesh: THREE.Mesh;
   private readonly material: THREE.MeshStandardMaterial;
@@ -88,6 +58,8 @@ export class IngredientEntity implements Draggable, Updatable, Cookable {
   private readonly burntColor: THREE.Color;
   private readonly tmpColor = new THREE.Color();
   private heat: CookMode | null = null;
+  /** The cook mode this item is bound to once it first starts cooking. */
+  private lockedMode: CookMode | null = null;
   private cookTime = 0; // fryer: single accumulator
   private readonly sideTimes: [number, number] = [0, 0]; // grill: per-side
   private downSide = 0;
@@ -116,7 +88,7 @@ export class IngredientEntity implements Draggable, Updatable, Cookable {
       color: def.color,
       roughness: 0.6,
       metalness: 0.05,
-      flatShading: def.shape === 'nugget' || def.shape === 'leaf',
+      flatShading: isFlatShaded(def.shape),
       emissive: new THREE.Color(def.color),
       emissiveIntensity: 0,
     });
@@ -156,6 +128,11 @@ export class IngredientEntity implements Draggable, Updatable, Cookable {
   /** Whether this item may be used in a correct order (cooked ones must be perfect). */
   get isReady(): boolean {
     return !this.cookable || this.cookStateInternal === 'perfect';
+  }
+
+  /** A single loose ingredient can be served on its own (e.g. a fries serving). */
+  getServing(): Serving {
+    return { ids: [this.definitionId], allReady: this.isReady };
   }
 
   /** Places the item at a resting position (spawn or forced move). */
@@ -215,7 +192,10 @@ export class IngredientEntity implements Draggable, Updatable, Cookable {
   beginCooking(mode: CookMode): void {
     // Safety: non-cookable items (buns, toppings) never heat up, even if mis-wired.
     if (!this.cookable) return;
-    this.heat = mode;
+    // Bind to the first mode used so the two accumulators can never be mixed
+    // (an ingredient's validStations should not include both grill and fryer).
+    if (this.lockedMode === null) this.lockedMode = mode;
+    this.heat = this.lockedMode;
   }
 
   endCooking(): void {

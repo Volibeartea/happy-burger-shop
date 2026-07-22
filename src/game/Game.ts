@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { SceneManager } from '@/scene/SceneManager';
 import { InputManager } from '@/input/InputManager';
 import { InteractionRegistry } from '@/input/InteractionRegistry';
@@ -10,10 +10,14 @@ import { HUD } from '@/ui/HUD';
 import { BrowserPlatform } from '@/platform/BrowserPlatform';
 import { SaveService } from '@/platform/SaveService';
 import { IngredientEntity } from '@/entities/IngredientEntity';
+import { Burger } from '@/entities/Burger';
+import { isServable } from '@/entities/Servable';
 import { getIngredient, SPAWNABLE_INGREDIENT_IDS } from '@/data/ingredients';
-import { MAX_LOOSE_ITEMS, SPAWN_POINT, STATION_LAYOUT } from '@/game/GameConfig';
+import { RecipeManager } from '@/systems/RecipeManager';
+import { COUNTER_TOP_Y, MAX_LOOSE_ITEMS, SPAWN_POINT, STATION_LAYOUT } from '@/game/GameConfig';
 import type { GameContext } from '@/game/GameContext';
 import type { Draggable } from '@/input/InteractionTypes';
+import type { Updatable } from '@/game/Updatable';
 import type { Station } from '@/stations/Station';
 import { FryerStation } from '@/stations/FryerStation';
 import { GrillStation } from '@/stations/GrillStation';
@@ -21,6 +25,9 @@ import { AssemblyStation } from '@/stations/AssemblyStation';
 import { StorageStation } from '@/stations/StorageStation';
 import { ServingStation } from '@/stations/ServingStation';
 import { TrashStation } from '@/stations/TrashStation';
+
+/** A live, updatable, draggable world object (loose ingredient or burger). */
+type WorldItem = Draggable & Updatable;
 
 /**
  * Top-level orchestrator. Wires the scene, input, stations, HUD and loop, and
@@ -36,7 +43,9 @@ export class Game implements GameContext {
   private readonly state: GameState;
   private readonly platform: BrowserPlatform;
   private readonly save: SaveService;
-  private readonly entities = new Set<IngredientEntity>();
+  private readonly recipes = new RecipeManager();
+  private readonly entities = new Set<WorldItem>();
+  private assembly!: AssemblyStation;
   private spawnCounter = 0;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
@@ -94,8 +103,32 @@ export class Game implements GameContext {
 
   removeItem(item: Draggable): void {
     this.registry.removeInteractive(item);
-    this.entities.delete(item as IngredientEntity);
+    this.entities.delete(item as WorldItem);
     item.dispose();
+  }
+
+  // --- Assembly → Burger ---
+
+  private packageAssembly(): void {
+    if (!this.assembly.hasItems()) return;
+    const items = this.assembly.takeAll();
+    const ids: string[] = [];
+    let allReady = true;
+    for (const item of items) {
+      const serving = isServable(item)
+        ? item.getServing()
+        : { ids: [item.definitionId], allReady: true };
+      ids.push(...serving.ids);
+      allReady = allReady && serving.allReady;
+      this.removeItem(item);
+    }
+
+    const burger = new Burger(ids, allReady);
+    const p = STATION_LAYOUT.assembly.position;
+    burger.setPosition(new THREE.Vector3(p.x, COUNTER_TOP_Y, p.z + 2.4));
+    this.scene.add(burger.root);
+    this.registry.addInteractive(burger);
+    this.entities.add(burger);
   }
 
   // --- Setup ---
@@ -109,8 +142,16 @@ export class Game implements GameContext {
   private buildStations(): void {
     this.addStation(new GrillStation(STATION_LAYOUT.grill));
     this.addStation(new FryerStation(STATION_LAYOUT.fryer));
-    this.addStation(new AssemblyStation(STATION_LAYOUT.assembly));
-    this.addStation(new ServingStation(STATION_LAYOUT.serving, this));
+
+    this.assembly = new AssemblyStation(STATION_LAYOUT.assembly, () => this.packageAssembly());
+    this.addStation(this.assembly);
+    this.registry.addInteractive(this.assembly.getPlate());
+
+    this.addStation(
+      new ServingStation(STATION_LAYOUT.serving, this, this.recipes, (result) =>
+        this.hud.showToast(result.message, result.ok),
+      ),
+    );
     this.addStation(new TrashStation(STATION_LAYOUT.trash, this));
 
     // Storage is decor + clickable bins, not a drop target.

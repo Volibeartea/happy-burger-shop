@@ -2,10 +2,10 @@
 
 > 這是一份**持續維護**的開發文件。每完成一個階段或做出重要設計決策，都應更新對應章節與最後的〈變更紀錄〉。
 >
-> - 文件版本：`v0.2`
-> - 對應程式版本：`0.2.0`
+> - 文件版本：`v0.3`
+> - 對應程式版本：`0.3.0`
 > - 最後更新：2026-07-22
-> - 目前開發階段：**第二階段（烹調系統）完成**
+> - 目前開發階段：**第三階段（組裝與食譜）完成**
 
 ---
 
@@ -82,12 +82,13 @@
 - [x] 完成提示（顏色漸變 + ✓完美標記 + 跳動）與燒焦標記
 - [x] 烹調推進：食材於自身 `update(dt)` 中依站台施加的 heat 模式推進（見設計決策 #9）
 
-### 第三階段：組裝與食譜 — ⬜ 未開始
+### 第三階段：組裝與食譜 — ✅ 完成
 
-- [ ] 麵包與配料完整放入組裝台，3D 垂直堆疊成可辨識漢堡
-- [ ] `Burger` 聚合物件（可整份拖曳）
-- [ ] `RecipeManager`：以**材料多重集合**比對食譜
-- [ ] 出餐區判定、垃圾桶丟棄整份
+- [x] 麵包與配料放入組裝台，3D 垂直堆疊
+- [x] 點擊「打包」→ `Burger` 聚合物件（可整份拖曳）
+- [x] `RecipeManager`：以**材料多重集合**比對食譜（O(1) 查表，不檢查順序）
+- [x] 出餐區判定（比對食譜 + 全熟）並以 toast 回饋；垃圾桶丟棄整份
+- [x] 單一完成食材（如薯條）可直接出餐
 
 ### 第四階段：訂單與遊戲流程 — ⬜ 未開始
 
@@ -156,7 +157,12 @@ happy-burger-shop/
    │  └─ InteractionRegistry.ts   ✅ mesh→物件解析、drop 判定
    ├─ entities/
    │  ├─ IngredientEntity.ts      ✅ 資料驅動食材（拖曳＋烹調狀態機＋翻面＋提示）
-   │  └─ Cookable.ts              ✅ Cookable 介面 + isCookable 判斷
+   │  ├─ Burger.ts                ✅ 組裝完成的漢堡聚合物（整份拖曳、可出餐）
+   │  ├─ Cookable.ts              ✅ Cookable 介面 + isCookable 判斷
+   │  ├─ Servable.ts              ✅ Servable 介面（出餐時提供 ids + allReady）
+   │  └─ shapes.ts                ✅ 共用 buildShape（食材/漢堡共用幾何）
+   ├─ systems/
+   │  └─ RecipeManager.ts         ✅ 多重集合食譜比對（O(1) 查表）
    ├─ stations/
    │  ├─ Station.ts               ✅ 站台基底（本體/名牌/footprint/高亮）
    │  ├─ CookingStation.ts        ✅ 有格位的烹調站基底（容量/釋放）
@@ -181,8 +187,8 @@ happy-burger-shop/
       └─ main.css                 ✅ HUD/畫面樣式
 
 # 後續階段將新增（尚未建立，避免空殼）
-   systems/  OrderManager(P4) RecipeManager(P3) ScoreManager(P4) AudioManager(P5)
-   entities/ Burger(P3) CustomerOrder(P4)
+   systems/  OrderManager(P4) ScoreManager(P4) AudioManager(P5)
+   entities/ CustomerOrder(P4)
    ui/       OrderCard(P4) StartScreen(P4) ResultScreen(P4)
 electron/    main.ts preload.ts ipc/*   （未來 Electron 階段）
 
@@ -302,12 +308,14 @@ interface RecipeDefinition {
 
 ---
 
-## 10. 組裝與食譜系統（第三階段規格）
+## 10. 組裝與食譜系統（第三階段 — 已實作）
 
-- 組裝台可放入麵包/配料/完成食材，於 3D 垂直堆疊成可辨識漢堡（`AssemblyStation` 已支援堆疊與 `getStackIds()`）。
-- `Burger` 聚合物件：可整份拖到出餐區或垃圾桶。
-- 出餐判定（v1）：以**材料種類與數量**比對，不檢查堆疊順序（起司與生菜對調仍算正確）。
-- `RecipeManager`：多重集合比對，新增食譜不需改判定核心。
+- 組裝台可放入麵包/配料/完成食材，於 3D 垂直堆疊（依 `stackHeight` 累加）。
+- **打包**：組裝台前方有「打包」pad（獨立 Interactive）；點擊 → `Game.packageAssembly()` 讀取 `takeAll()`、銷毀個別食材、建立單一 `Burger`（帶材料 id 多重集合與 `allReady`）。
+- `Burger`：整份可拖到出餐區或垃圾桶；材質採各成分的 cooked 顏色。
+- **出餐判定（v1）**：`RecipeManager.match(ids)` 以**材料種類與數量**（多重集合、`sort().join()` O(1) 查表）比對，不檢查堆疊順序（起司與生菜對調仍算正確）；並要求 `allReady`（所有可烹調成分為 perfect，燒焦/未熟不算）。
+- **單一食材出餐**：`IngredientEntity` 亦實作 `Servable`，故完成的薯條可直接拖到出餐區（對應 `friesServing` 食譜）。
+- 回饋：出餐結果以 HUD toast 顯示（✓ 食譜名 / ✗ 原因）。第四階段接訂單與計分。
 
 ---
 
@@ -388,6 +396,9 @@ electron/
 | 8 | 單一 Set 追蹤所有食材實體 | 同時可 update 與被 remove，避免多容器同步問題 |
 | 9 | 烹調狀態放在 `IngredientEntity`、以 `Cookable` 介面 + heat 閘門推進，不另立 CookingSystem | 狀態與其網格/視覺同源、隨既有 update 推進；避免過薄 Manager 與同步問題 |
 | 10 | 翻面用「點擊食材」而非額外按鈕 | 沿用既有點擊/拖曳分辨：點擊=翻面、拖曳=移動，無新 UI |
+| 11 | 組裝以「打包」pad 明確定案成 Burger，而非直接拖整疊 | 建構時個別食材可加/移除，打包後才整份出餐，避免「拿最上層 vs 拿整份」歧義 |
+| 12 | 無效放置改為「放回原容器」而非只回原位 | 修正審查發現：烹調中食材拖出後無效放置會卡在爐上不再烹調且格位外洩（見 v0.2.1） |
+| 13 | 持有食材的站台以 `ItemHolder = DropTarget & ItemContainer` 表示 | 讓「放回原容器」能重新 accept（回格位 + 續煮），型別清楚 |
 
 ---
 
@@ -403,9 +414,9 @@ electron/
 
 ## 19. 已知問題與限制（第一階段）
 
-- 尚無烹調、訂單、計時、分數、結算（屬第二～四階段）。
-- `data/recipes.ts` 已備資料但第一階段未使用（P3 接上）。
-- 拖曳落點視差（front-strip 死區）已於審查後修正：改以站台頂面 `DROP_PLANE_Y` 投影做落點判定，食材仍以 `CARRY_HEIGHT` 呈現。
+- 尚無訂單、耐心、計時、生命、分數/金錢/Combo、開始/結算畫面（屬第四階段）。
+- 出餐目前只比對「是否符合任一食譜」，尚未綁定特定訂單與計分（第四階段）。
+- 拖曳落點視差（front-strip 死區）已於審查後修正：改以站台頂面 `DROP_PLANE_Y` 投影做落點判定。
 - 無音效（第五階段）。
 - 尚未針對觸控最佳化（第一版以桌面滑鼠為主）。
 - Three.js 打包體積 > 500 kB（單一 chunk 警告）；未來可 code-split，暫不處理。
@@ -413,6 +424,19 @@ electron/
 ---
 
 ## 20. 變更紀錄（Changelog）
+
+### v0.3（2026-07-22）— 第三階段完成（組裝與食譜）
+
+- `RecipeManager`：材料多重集合 O(1) 查表比對，不檢查堆疊順序。
+- 組裝台「打包」pad → 建立 `Burger` 聚合物件（整份可拖曳出餐/丟棄）。
+- `Servable` 介面：`Burger` 與單一 `IngredientEntity`（如薯條）皆可出餐。
+- 出餐區比對食譜 + 全熟檢查，HUD toast 回饋（✓/✗）。
+- 共用 `entities/shapes.ts`（食材/漢堡幾何 DRY）。
+- **併入第二階段審查修正（v0.2.1）**：
+  - 烹調中食材拖出後無效放置/取消 → 改為「重新放回原容器」（回格位並續煮），修正卡在爐上不再烹調與格位外洩。
+  - 新增 `ItemHolder = DropTarget & ItemContainer` 型別。
+  - 烹調模式在首次受熱後鎖定，避免煎/炸累加器混用（資料上目前不可達，屬防禦性）。
+- `tsc` + `vite build` 通過。
 
 ### v0.2（2026-07-22）— 第二階段完成（烹調系統）
 
